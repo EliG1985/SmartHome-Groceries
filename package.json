@@ -1,0 +1,30 @@
+{
+  "name": "smarthome-groceries-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @smarthome/frontend\" \"npm run dev --workspace @smarthome/backend\"",
+    "dev:frontend": "npm run dev --workspace @smarthome/frontend",
+    "dev:backend": "npm run dev --workspace @smarthome/backend",
+    "dev:mobile": "npm run start --workspace @smarthome/mobile",
+    "dev:mobile:web": "npm run web --workspace @smarthome/mobile -- --clear --port 8084",
+    "mobile:android": "npm run android --workspace @smarthome/mobile",
+    "mobile:ios": "npm run ios --workspace @smarthome/mobile",
+    "build": "npm run build --workspace @smarthome/frontend && npm run build --workspace @smarthome/backend",
+    "build:mobile": "npm run build --workspace @smarthome/mobile",
+    "lint": "npm run lint --workspace @smarthome/frontend && npm run lint --workspace @smarthome/backend",
+    "preview": "npm run preview --workspace @smarthome/frontend"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "expo-module-scripts": "^55.0.2",
+    "prettier": "^3.8.1"
+  }
+}
