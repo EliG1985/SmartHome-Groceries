@@ -1,4 +1,3 @@
-  const [shoppingListStyle, setShoppingListStyle] = useState<'modern' | 'classic'>('modern');
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
@@ -262,8 +261,11 @@ if (Platform.OS === 'web' && typeof __DEV__ !== 'undefined' && __DEV__) {
 
 type NotificationsModule = typeof import('expo-notifications');
 
+// Expo Go does not support expo-notifications for push notifications (SDK 53+)
+const isExpoGo = typeof navigator !== 'undefined' && navigator.product === 'ExpoGo';
+
 const getNotificationsModule = (): NotificationsModule | null => {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web' || isExpoGo) return null;
   return require('expo-notifications') as NotificationsModule;
 };
 
@@ -1301,6 +1303,10 @@ export default function App() {
         </View>
       </SafeAreaView>
     );
+  }
+
+  function setShoppingListStyle(arg0: string): void {
+    throw new Error('Function not implemented.');
   }
 
   return (
