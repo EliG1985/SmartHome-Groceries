@@ -1,0 +1,53 @@
+מסמך דרישות טכניות - SmartHome Groceries
+
+1. סקירה ארכיטקטונית
+- מונורפו עם שתי אפליקציות:
+  - פרונטאנד: React + Vite + Redux Toolkit + Tailwind
+  - בקאנד: Express + TypeScript + Supabase
+- פלטפורמת נתונים: Supabase Postgres + Storage + RLS + Realtime
+
+2. API בקאנד (מיושם)
+כל מסלולי /api דורשים Middleware והרשאות משפחתיות.
+
+2.1 בריאות
+- GET /health
+
+2.2 מלאי
+- GET /api/inventory
+- POST /api/inventory
+- PATCH /api/inventory/:id/status
+- PATCH /api/inventory/:id
+- DELETE /api/inventory/:id
+ולידציה: שם מוצר, קטגוריה, תאריך תפוגה חובה; סטטוס; מחיר וכמות.
+שומרי הרשאות: viewers חסומים לכתיבה; פרימיום נדרש למשפחה מרובת משתתפים.
+
+2.3 דוחות
+- GET /api/reports/summary
+- GET /api/reports/supermarket-insights?supermarket=<name>
+- POST /api/reports/supermarket-insights/apply-categories
+- GET /api/reports/product-price?supermarket=<name>&productName=<name>&barcode=<optional>&fallbackPrice=<optional>
+התנהגות: ניסיון למחיר חי; fallback למחיר בסיסי.
+
+2.4 שיתוף פעולה
+- GET /api/collaboration/participants
+- GET /api/collaboration/me
+- POST /api/collaboration/participants/invite-by-email
+- PATCH /api/collaboration/participants/:memberId/role
+- GET /api/collaboration/my-invitations
+- POST /api/collaboration/my-invitations/:id/respond
+- GET /api/collaboration/chat/messages?limit=100
+- POST /api/collaboration/chat/messages
+- POST /api/collaboration/chat/image-urls
+- GET /api/collaboration/substitutes/suggestions?productName=<name>
+- POST /api/collaboration/substitutes/learn
+- GET /api/collaboration/subscription-status
+שומרי הרשאות: ניהול משתתפים דורש non-viewer; עדכון תפקיד owner; viewers חסומים לכתיבה; פרימיום נדרש.
+
+3. חוזי פיצ'רים בפרונטאנד
+- Redux slices: auth, inventory
+- Tabs: list, inventory, chat, store, reports, participants, settings
+- חוזי realtime: inventory, invitations, chat
+- חוזה מדיה בצ'אט: attachments, storage, URL חתום
+
+4. מודל נתונים (Supabase)
+- טבלאות: families, users_profile, products, inventory, family_invitations, chat_messages, chat_message_attachments, product_substitutes, family_subscriptions

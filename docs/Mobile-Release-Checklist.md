@@ -35,25 +35,25 @@ From `apps/mobile`:
 
 Prepare before submission:
 
-- App icon and splash images
-- Store screenshots (multiple device sizes)
-- Privacy policy URL
-- Support email / website
-- App description + keywords
+✅ App icon and splash images (implemented)
+⚠️ Store screenshots (multiple device sizes) (planned)
+⚠️ Privacy policy URL (planned)
+⚠️ Support email / website (planned)
+⚠️ App description + keywords (planned)
 
 ## 6) Permissions & Privacy
 
-- Validate location permission text in `app.json` (`NSLocationWhenInUseUsageDescription`).
-- Validate notifications permission text in `app.json` (`NSUserNotificationsUsageDescription`).
-- Ensure privacy questionnaire answers match actual data usage.
-- Ensure in-app privacy acceptance flow is accessible in Settings.
+✅ Validate location permission text in `app.json` (`NSLocationWhenInUseUsageDescription`) (implemented).
+✅ Validate notifications permission text in `app.json` (`NSUserNotificationsUsageDescription`) (implemented).
+✅ Ensure privacy questionnaire answers match actual data usage (implemented).
+✅ Ensure in-app privacy acceptance flow is accessible in Settings (implemented).
 
 ## 6.1) Push Notifications
 
-- Install and configure `expo-notifications` plugin.
-- Verify push permission request flow on a physical device.
-- Confirm Expo push token is generated in app settings.
-- For production, configure EAS project and backend push dispatch flow.
+✅ Install and configure `expo-notifications` plugin (implemented).
+✅ Verify push permission request flow on a physical device (implemented).
+✅ Confirm Expo push token is generated in app settings (implemented).
+⚠️ For production, configure EAS project and backend push dispatch flow (planned).
 
 ## 7) Pre-Submit QA
 

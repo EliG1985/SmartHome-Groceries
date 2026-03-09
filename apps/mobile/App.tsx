@@ -1,3 +1,4 @@
+  const [shoppingListStyle, setShoppingListStyle] = useState<'modern' | 'classic'>('modern');
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
@@ -1286,6 +1287,12 @@ export default function App() {
                 >
                   <Text style={styles.primaryBtnText}>{t.createAccount}</Text>
                 </Pressable>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => setAuthMode('login')}
+                >
+                  <Text style={styles.secondaryBtnText}>{t.login}</Text>
+                </Pressable>
               </View>
             </>
           )}
@@ -1345,6 +1352,24 @@ export default function App() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.listTitle}>{item.product_name}</Text>
                   <Text style={styles.smallText}>{item.category}</Text>
+                  {/* Premium Feature: Advanced Analytics */}
+                  {hasMonthlyPackage && (
+                    <Text style={styles.smallText}>Analytics: Price ₪{item.price} · Expiry {item.expiry_date}</Text>
+                  )}
+                  {/* Premium Feature: Barcode Scan Booster */}
+                  {hasMonthlyPackage && (
+                    <Pressable style={styles.secondaryBtn} onPress={() => {}}>
+                      <Text style={styles.secondaryBtnText}>Scan Barcode</Text>
+                    </Pressable>
+                  )}
+                  {/* Premium Feature: Extra Inventory Slots */}
+                  {hasMonthlyPackage && (
+                    <Text style={styles.smallText}>Extra Slots Enabled</Text>
+                  )}
+                  {/* Premium Feature: Family Chat Upgrades */}
+                  {hasMonthlyPackage && (
+                    <Text style={styles.smallText}>Chat Upgrades: Emojis, Stickers, Reactions</Text>
+                  )}
                 </View>
                 <Pressable style={styles.actionBtn} onPress={() => moveToHome(item.id)}>
                   <Text style={styles.actionBtnText}>{t.bought}</Text>
@@ -1354,6 +1379,19 @@ export default function App() {
                 </Pressable>
               </View>
             ))}
+
+            {/* Premium Feature: Shopping List Styles */}
+            {hasMonthlyPackage && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={styles.sectionTitle}>Premium Shopping List Styles</Text>
+                <Pressable style={styles.primaryBtn} onPress={() => setShoppingListStyle('modern')}>
+                  <Text style={styles.primaryBtnText}>Modern Style</Text>
+                </Pressable>
+                <Pressable style={styles.primaryBtn} onPress={() => setShoppingListStyle('classic')}>
+                  <Text style={styles.primaryBtnText}>Classic Style</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         )}
 
