@@ -1,9 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
+import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import { createClient, type Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { THEMES, getUnlockedThemes, unlockTheme, Theme } from './themes';
 import {
   Alert,
   Animated,
@@ -294,17 +296,52 @@ function createId() {
 }
 
 export default function App() {
-  const { width: windowWidth } = useWindowDimensions();
-  const drawerWidth = Math.min(340, Math.max(240, Math.floor(windowWidth * 0.78)));
-
-  const [locale, setLocale] = useState<Locale>('en');
-  const [activeTab, setActiveTab] = useState<AppTab>('list');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showLanguageOptions, setShowLanguageOptions] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [statusText, setStatusText] = useState<string>('');
+    // Real-time geolocation tracker
+    const [location, setLocation] = useState<{ latitude: string, longitude: string } | null>(null);
+    const [locationError, setLocationError] = useState<string | null>(null);
+    // Theme unlock and selection
+    const [selectedThemeId, setSelectedThemeId] = useState('default');
+    const [unlockedThemes, setUnlockedThemes] = useState<string[]>(['default']);
+    const [themeSelectorOpen, setThemeSelectorOpen] = useState(false);
+    const selectedTheme: Theme = THEMES.find(t => t.id === selectedThemeId) || THEMES[0];
+    const { width: windowWidth } = useWindowDimensions();
+    const drawerWidth = Math.min(340, Math.max(240, Math.floor(windowWidth * 0.78)));
+    const [locale, setLocale] = useState<Locale>('en');
+    const [activeTab, setActiveTab] = useState<AppTab>('list');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [showLanguageOptions, setShowLanguageOptions] = useState(false);
+    const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
+    const [authReady, setAuthReady] = useState(false);
+    const [statusText, setStatusText] = useState<string>('');
+    useEffect(() => {
+      // Load unlocked themes for user
+      if (currentUser) {
+        getUnlockedThemes(currentUser.id).then((themes) => setUnlockedThemes(themes));
+      }
+    }, [currentUser]);
+    useEffect(() => {
+      let watcher: Location.LocationSubscription | null = null;
+      (async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationError('Permission to access location was denied');
+          return;
+        }
+        watcher = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+          (pos) => {
+            setLocation({
+              latitude: String(pos.coords.latitude),
+              longitude: String(pos.coords.longitude),
+            });
+            setLatitude(String(pos.coords.latitude));
+            setLongitude(String(pos.coords.longitude));
+          }
+        );
+      })();
+      return () => { if (watcher) watcher.remove(); };
+    }, []);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -982,12 +1019,13 @@ export default function App() {
 
   const buyCoinPack = (coins: number) => {
     if (!currentUser) return;
-
     const next = coinsBalance + coins;
     setCoinsBalance(next);
     if (coinsKey) {
       void AsyncStorage.setItem(coinsKey, String(next));
     }
+    // Reload unlocked themes after coin purchase
+    if (currentUser) getUnlockedThemes(currentUser.id).then(setUnlockedThemes);
   };
 
   const buyMonthlyPackage = () => {
@@ -1038,18 +1076,13 @@ export default function App() {
   };
 
   const loadNearby = async () => {
-    const lat = Number(latitude);
-    const lon = Number(longitude);
+    const lat = location && typeof location.latitude === 'string' ? Number(location.latitude) : Number(latitude);
+    const lon = location && typeof location.longitude === 'string' ? Number(location.longitude) : Number(longitude);
     const radius = Number(radiusKm);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(radius)) {
-      setStatusText('Enter valid latitude, longitude and radius.');
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(radius) || radius < 0 || radius > 10000) {
+      setStatusText('Enter valid latitude, longitude and radius (0-10,000 km).');
       return;
     }
-
-    persistFieldHistory('latitude', latitude);
-    persistFieldHistory('longitude', longitude);
-    persistFieldHistory('radiusKm', radiusKm);
-
     try {
       const response = await fetch(
         `${API_BASE}/api/reports/nearby-supermarkets?latitude=${lat}&longitude=${lon}&radiusKm=${radius}`,
@@ -1264,14 +1297,14 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: selectedTheme.backgroundColor }]}> 
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <View style={{ justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-          <Text style={styles.title}>{t.appTitle}</Text>
+        <View style={{ justifyContent: 'center', alignItems: 'center', position: 'relative', backgroundColor: selectedTheme.backgroundColor }}>
+          <Text style={[styles.title, { color: selectedTheme.textColor }]}>{t.appTitle}</Text>
           <Pressable
-            style={[styles.menuButton, { position: 'absolute', right: 0, top: 0 }]} 
+            style={[styles.menuButton, { position: 'absolute', right: 0, top: 0 }]}
             onPress={() => (isMenuOpen ? closeMenu() : openMenu())}
           >
             <Text style={styles.menuEdgeButtonText}>≡</Text>
@@ -1367,7 +1400,6 @@ export default function App() {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>{t.storeTitle}</Text>
             <Text style={styles.smallText}>{t.coinsBalance}: {coinsBalance}</Text>
-
             <View style={styles.row}>
               <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(200)}>
                 <Text style={styles.secondaryBtnText}>{t.buy200}</Text>
@@ -1376,7 +1408,6 @@ export default function App() {
                 <Text style={styles.secondaryBtnText}>{t.buy500}</Text>
               </Pressable>
             </View>
-
             <View style={[styles.card, { marginTop: 12 }]}> 
               <Text style={styles.sectionTitle}>{t.monthlyPackageTitle}</Text>
               <Text style={styles.smallText}>{t.monthlyPackageHint}</Text>
@@ -1388,6 +1419,47 @@ export default function App() {
                   <Text style={styles.secondaryBtnText}>{t.cancelSubscription}</Text>
                 </Pressable>
               ) : null}
+            </View>
+            <View style={[styles.card, { marginTop: 12 }]}> 
+              <Text style={styles.sectionTitle}>App Themes & Backgrounds</Text>
+              <Pressable style={styles.primaryBtn} onPress={() => setThemeSelectorOpen((open) => !open)}>
+                <Text style={styles.primaryBtnText}>Select Theme</Text>
+              </Pressable>
+              {themeSelectorOpen && (
+                <View style={{ marginTop: 12 }}>
+                  {THEMES.map((theme) => {
+                    const unlocked = unlockedThemes.includes(theme.id);
+                    return (
+                      <View key={theme.id} style={{ marginBottom: 8, padding: 8, borderRadius: 8, backgroundColor: theme.backgroundColor }}>
+                        <Text style={{ color: theme.textColor, fontWeight: 'bold' }}>{theme.name}</Text>
+                        <Text style={{ color: theme.textColor }}>Price: {theme.price} coins</Text>
+                        {unlocked ? (
+                          <Pressable style={styles.secondaryBtn} onPress={() => setSelectedThemeId(theme.id)}>
+                            <Text style={styles.secondaryBtnText}>Apply</Text>
+                          </Pressable>
+                        ) : (
+                          <Pressable
+                            style={styles.secondaryBtn}
+                            onPress={async () => {
+                              if (coinsBalance >= theme.price && currentUser) {
+                                setCoinsBalance(coinsBalance - theme.price);
+                                await unlockTheme(currentUser.id, theme.id);
+                                getUnlockedThemes(currentUser.id).then(setUnlockedThemes);
+                                setSelectedThemeId(theme.id);
+                                showStatusText('Theme unlocked!', 3000);
+                              } else {
+                                showStatusText('Not enough coins to unlock this theme.', 3000);
+                              }
+                            }}
+                          >
+                            <Text style={styles.secondaryBtnText}>Unlock</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -1407,24 +1479,18 @@ export default function App() {
 
             <Text style={styles.smallText}>{t.nearbyLookup}</Text>
 
-            <TextInput
-              placeholder={t.latitude}
-              style={[styles.input, isRtl ? styles.inputRtl : styles.inputLtr]}
-              value={latitude}
-              onChangeText={setLatitude}
-              onFocus={() => onHistoryFieldFocus('latitude')}
-              onBlur={() => onHistoryFieldBlur('latitude', latitude)}
-            />
-            {renderSuggestions('latitude', latitude)}
-            <TextInput
-              placeholder={t.longitude}
-              style={[styles.input, isRtl ? styles.inputRtl : styles.inputLtr]}
-              value={longitude}
-              onChangeText={setLongitude}
-              onFocus={() => onHistoryFieldFocus('longitude')}
-              onBlur={() => onHistoryFieldBlur('longitude', longitude)}
-            />
-            {renderSuggestions('longitude', longitude)}
+            <View style={{ marginBottom: 8 }}>
+              <Text style={styles.smallText}>Current Location:</Text>
+              {locationError ? (
+                <Text style={[styles.smallText, { color: 'red' }]}>{locationError}</Text>
+              ) : location ? (
+                <Text style={styles.smallText}>
+                  Latitude: {location.latitude}, Longitude: {location.longitude}
+                </Text>
+              ) : (
+                <Text style={styles.smallText}>Locating...</Text>
+              )}
+            </View>
             <TextInput
               placeholder={t.radiusKm}
               style={[styles.input, isRtl ? styles.inputRtl : styles.inputLtr]}
