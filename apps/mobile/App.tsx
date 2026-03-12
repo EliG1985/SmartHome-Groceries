@@ -284,15 +284,7 @@ if (notificationsModule) {
 }
 
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        storage: AsyncStorage as unknown as Storage,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-      },
-    })
-  : null;
+// supabase is now imported from src/lib/supabase and is a singleton instance
 
 function createId() {
   return Math.random().toString(36).slice(2, 11);
@@ -468,7 +460,7 @@ export default function App() {
       setParticipants(participantPayload.members || []);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load profile.';
-      setStatusText(message);
+      showStatusText(message);
     }
   };
 
@@ -501,21 +493,20 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!supabase) {
-      setStatusText('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY for mobile auth.');
+    if (!supabase || !supabase.auth) {
       setAuthReady(true);
       return;
     }
 
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: { data: { session: Session } }) => {
       if (!isMounted) return;
       setSession(data.session);
       setAuthReady(true);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event: any, nextSession: Session) => {
       setSession(nextSession);
     });
 
@@ -637,12 +628,10 @@ export default function App() {
       clearTimeout(statusTimerRef.current);
       statusTimerRef.current = null;
     }
-    if (autoClearMs && autoClearMs > 0) {
-      statusTimerRef.current = setTimeout(() => {
-        setStatusText('');
-        statusTimerRef.current = null;
-      }, autoClearMs);
-    }
+    statusTimerRef.current = setTimeout(() => {
+      setStatusText('');
+      statusTimerRef.current = null;
+    }, 5000);
   };
 
   const suggestionsFor = (field: HistoryField, value: string): string[] => {
@@ -683,7 +672,7 @@ export default function App() {
       radiusKm: [],
     });
     setActiveHistoryField(null);
-    setStatusText(t.savedInputsCleared);
+    // Do not show info message for clearing inputs
   };
 
   const renderSuggestions = (field: HistoryField, value: string) => {
@@ -773,12 +762,12 @@ export default function App() {
     const notifications = getNotificationsModule();
     if (!notifications) {
       setPushPermission('denied');
-      setStatusText('Push notifications are not supported on web.');
+      showStatusText('Push notifications are not supported on web.');
       return;
     }
 
     if (!Device.isDevice) {
-      setStatusText('Push notifications require a physical device.');
+      showStatusText('Push notifications require a physical device.');
       return;
     }
 
@@ -792,7 +781,7 @@ export default function App() {
 
     if (finalStatus !== 'granted') {
       setPushPermission('denied');
-      setStatusText('Push notification permission denied.');
+      showStatusText('Push notification permission denied.');
       return;
     }
 
@@ -807,15 +796,15 @@ export default function App() {
     try {
       const token = await notifications.getExpoPushTokenAsync();
       setExpoPushToken(token.data);
-      setStatusText('Push notifications enabled.');
+      showStatusText('Push notifications enabled.');
     } catch {
-      setStatusText('Push permission granted, token fetch failed (set EAS project config for production).');
+      showStatusText('Push permission granted, token fetch failed (set EAS project config for production).');
     }
   };
 
   const requireUnlockedFeature = (tab: AppTab) => {
     if (['inventory', 'chat', 'reports', 'participants'].includes(tab) && premiumFeaturesLocked) {
-      setStatusText('This feature is locked. Purchase Monthly Package in Store to unlock it.');
+      showStatusText('This feature is locked. Purchase Monthly Package in Store to unlock it.');
       setActiveTab('store');
       return false;
     }
@@ -823,8 +812,8 @@ export default function App() {
   };
 
   const onLogin = async () => {
-    if (!supabase) {
-      showStatusText('Supabase auth is not configured in mobile env.');
+    if (!supabase || !supabase.auth) {
+      showStatusText('Supabase auth is not configured or missing.');
       return;
     }
 
@@ -999,7 +988,7 @@ export default function App() {
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : 'Could not update item.';
-        setStatusText(message);
+        showStatusText(message);
       });
   };
 
@@ -1016,7 +1005,7 @@ export default function App() {
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : 'Could not delete item.';
-        setStatusText(message);
+        showStatusText(message);
       });
   };
 
@@ -1299,7 +1288,11 @@ export default function App() {
             </>
           )}
 
-          {!!statusText && <Text style={styles.infoText}>{statusText}</Text>}
+          {!!statusText && (
+            <View style={styles.centeredAlertContainer}>
+              <Text style={styles.centeredAlertText}>{statusText}</Text>
+            </View>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -1316,14 +1309,14 @@ export default function App() {
       <View style={styles.header}>
         <View style={{ justifyContent: 'center', alignItems: 'center', position: 'relative', backgroundColor: selectedTheme.backgroundColor }}>
           <Text style={[styles.title, { color: selectedTheme.textColor }]}>{t.appTitle}</Text>
-          <Pressable
-            style={[styles.menuButton, { position: 'absolute', right: 0, top: 0 }]}
-            onPress={() => (isMenuOpen ? closeMenu() : openMenu())}
-          >
-            <Text style={styles.menuEdgeButtonText}>≡</Text>
-          </Pressable>
         </View>
       </View>
+      <Pressable
+        style={[styles.menuButton, styles.menuButtonBottomRight]}
+        onPress={() => (isMenuOpen ? closeMenu() : openMenu())}
+      >
+        <Text style={styles.menuEdgeButtonText}>≡</Text>
+      </Pressable>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {activeTab === 'list' && (
@@ -1441,29 +1434,55 @@ export default function App() {
         )}
 
         {activeTab === 'store' && (
-          <View style={styles.card}>
+          <ScrollView style={styles.card} contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={styles.sectionTitle}>{t.storeTitle}</Text>
             <Text style={styles.smallText}>{t.coinsBalance}: {coinsBalance}</Text>
-            <View style={styles.row}>
-              <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(200)}>
-                <Text style={styles.secondaryBtnText}>{t.buy200}</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(500)}>
-                <Text style={styles.secondaryBtnText}>{t.buy500}</Text>
-              </Pressable>
-            </View>
+            {/* Coin Packs */}
             <View style={[styles.card, { marginTop: 12 }]}> 
-              <Text style={styles.sectionTitle}>{t.monthlyPackageTitle}</Text>
-              <Text style={styles.smallText}>{t.monthlyPackageHint}</Text>
-              <Pressable style={styles.primaryBtn} onPress={buyMonthlyPackage}>
-                <Text style={styles.primaryBtnText}>{hasMonthlyPackage ? t.purchased : t.purchaseMonthly}</Text>
-              </Pressable>
-              {hasMonthlyPackage ? (
-                <Pressable style={styles.secondaryBtn} onPress={() => void cancelMonthlyPackage()}>
-                  <Text style={styles.secondaryBtnText}>{t.cancelSubscription}</Text>
+              <Text style={styles.sectionTitle}>Coin Packs</Text>
+              <View style={styles.coinPackRow}>
+                <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(200)}>
+                  <Text style={styles.secondaryBtnText}>Buy 200 coins</Text>
                 </Pressable>
-              ) : null}
+                <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(500)}>
+                  <Text style={styles.secondaryBtnText}>Buy 500 coins</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(1000)}>
+                  <Text style={styles.secondaryBtnText}>Buy 1000 coins</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryBtn} onPress={() => buyCoinPack(2000)}>
+                  <Text style={styles.secondaryBtnText}>Buy 2000 coins</Text>
+                </Pressable>
+              </View>
             </View>
+            {/* Subscriptions */}
+            <View style={[styles.card, { marginTop: 12 }]}> 
+              <Text style={styles.sectionTitle}>Subscriptions</Text>
+              <View style={{ marginBottom: 8 }}>
+                <Text style={styles.smallText}>Monthly Package: ₪80/month</Text>
+                <Pressable style={styles.primaryBtn} onPress={buyMonthlyPackage}>
+                  <Text style={styles.primaryBtnText}>{hasMonthlyPackage ? t.purchased : t.purchaseMonthly}</Text>
+                </Pressable>
+                {hasMonthlyPackage ? (
+                  <Pressable style={styles.secondaryBtn} onPress={() => void cancelMonthlyPackage()}>
+                    <Text style={styles.secondaryBtnText}>{t.cancelSubscription}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={{ marginBottom: 8 }}>
+                <Text style={styles.smallText}>Annual Package: ₪800/year (first month free)</Text>
+                <Pressable style={styles.primaryBtn} onPress={() => showStatusText('Annual package purchase coming soon!', 3000)}>
+                  <Text style={styles.primaryBtnText}>Purchase Annual Package</Text>
+                </Pressable>
+              </View>
+              <View style={{ marginBottom: 8 }}>
+                <Text style={styles.smallText}>Family Collaboration: Unlocks chat, reports, shared lists</Text>
+                <Pressable style={styles.primaryBtn} onPress={() => showStatusText('Family collaboration purchase coming soon!', 3000)}>
+                  <Text style={styles.primaryBtnText}>Purchase Family Collaboration</Text>
+                </Pressable>
+              </View>
+            </View>
+            {/* Themes & Skins */}
             <View style={[styles.card, { marginTop: 12 }]}> 
               <Text style={styles.sectionTitle}>App Themes & Backgrounds</Text>
               <Pressable style={styles.primaryBtn} onPress={() => setThemeSelectorOpen((open) => !open)}>
@@ -1505,7 +1524,7 @@ export default function App() {
                 </View>
               )}
             </View>
-          </View>
+          </ScrollView>
         )}
 
         {activeTab === 'settings' && (
@@ -1606,7 +1625,11 @@ export default function App() {
           </View>
         )}
 
-        {!!statusText && <Text style={[styles.infoText, { marginTop: 12 }]}>{statusText}</Text>}
+        {statusText && statusText !== '' && (
+          <View style={styles.centeredAlertContainer}>
+            <Text style={styles.centeredAlertText}>{statusText}</Text>
+          </View>
+        )}
       </ScrollView>
 
       {isMenuOpen && (
@@ -1633,6 +1656,14 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+    coinPackRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 8,
+      marginBottom: 8,
+    },
   safeArea: {
     flex: 1,
     backgroundColor: '#ebe7f5',
@@ -1645,8 +1676,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 18,
     backgroundColor: '#8b5cf6',
-    boxShadow: '0px 8px 14px rgba(91,33,182,0.25)',
-    elevation: 6,
+    boxShadow: '0px 8px 14px rgba(91,33,182,0.25)', // web
+    elevation: 6, // native
   },
   title: {
     fontSize: 22,
@@ -1678,9 +1709,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    boxShadow: '0px 6px 12px rgba(91,33,182,0.18)',
-    elevation: 7,
+    boxShadow: '0px 6px 12px rgba(91,33,182,0.18)', // web
+    elevation: 7, // native
+  },
+  menuButtonBottomRight: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    marginRight: 0,
+    zIndex: 100,
   },
   menuEdgeButtonText: {
     color: '#5b21b6',
@@ -1707,8 +1744,8 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingHorizontal: 14,
     zIndex: 33,
-    boxShadow: '0px 8px 18px rgba(15,23,42,0.2)',
-    elevation: 10,
+    boxShadow: '0px 8px 18px rgba(15,23,42,0.2)', // web
+    elevation: 10, // native
   },
   drawerHandle: {
     width: 54,
@@ -1747,8 +1784,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
-    boxShadow: '0px 5px 10px rgba(124,58,237,0.08)',
-    elevation: 2,
+    boxShadow: '0px 5px 10px rgba(124,58,237,0.08)', // web
+    elevation: 2, // native
   },
   sectionTitle: {
     fontSize: 16,
@@ -2021,5 +2058,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     fontSize: 12,
+  },
+  centeredAlertContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 300,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dacbfd',
+    alignItems: 'center',
+    elevation: 8,
+    zIndex: 999,
+    transform: [{ translateX: -150 }, { translateY: -30 }],
+  },
+  centeredAlertText: {
+    fontSize: 16,
+    color: '#5b21b6',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

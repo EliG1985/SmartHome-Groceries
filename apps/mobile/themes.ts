@@ -13,9 +13,9 @@ export const THEMES: Theme[] = [
   {
     id: 'default',
     name: 'Classic Violet',
-    backgroundColor: '#ebe7f5',
+    backgroundColor: '#8b5cf6', // Purple color for default UI background
     gradient: 'linear-gradient(135deg, #8b5cf6 0%, #f4efff 100%)',
-    textColor: '#0f172a',
+    textColor: '#ffffff', // White text for contrast
     price: 0,
   },
   {
